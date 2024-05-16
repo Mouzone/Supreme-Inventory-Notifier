@@ -1,0 +1,17 @@
+Project Part 1 (Simple Scrape)
+- start from: "https://us.supreme.com/pages/shop"
+- simple request able to get the site's html
+- parse:
+    - all list items with class=bg-gray--2 position-relative
+    - grab /products/y6ztwlp4zr-jhlnp from each list items <a> tag
+    - iterate through each js-thumbnail-group and click the first link
+        - check h1 product title
+        - check class="fontWeight-bold mb-s display-none bpS-display-block js-variant" style="margin-bottom: 12px; font-size: 12px;" for the style
+        - check product-price
+        - then check each page's "product-button-wrap bpS-mt-7" and what the first div is for sold out
+    - log into array as class of item
+- output as csv when done
+- oputput in accessible twitter format
+
+
+
