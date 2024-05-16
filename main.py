@@ -7,6 +7,7 @@ start = "/pages/shop"
 links = collections.deque()
 items = []
 
+
 # at beginning collect all the item links synchronously
 
 # at each item scrape, process, add to list then add the other links(variants) to the queue
