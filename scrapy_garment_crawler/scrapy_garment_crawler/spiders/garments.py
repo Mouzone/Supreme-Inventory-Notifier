@@ -27,11 +27,9 @@ class GarmentSpider(scrapy.Spider):
     async def parse(self, response):
         page = response.meta["playwright_page"]
         await page.close()
-
-        for garment in response.css("article.product_pod"):
+        for garment in response.css("ul.shop-scroller a"):
             garment = Garment(
-                title=garment.css("h3 a::attr(title)").get(),
-                price=garment.css("p.price_color::text").get(),
+                link=garment.css("a::attr(href)").get(),
             )
             yield garment
 
