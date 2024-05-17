@@ -1,8 +1,8 @@
 import scrapy
-from scrapy_garments_crawler.items import Garment
+from scrapy_garment_crawler.items import Garment
 
 class GarmentSpider(scrapy.Spider):
-    name = "garments"
+    name = "garment"
     custom_settings = {
         "PLAYWRIGHT_LAUNCH_OPTIONS": {
             "proxy": {
