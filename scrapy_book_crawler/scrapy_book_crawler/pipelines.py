@@ -8,6 +8,6 @@
 from itemadapter import ItemAdapter
 
 
-class ScrapyCrawlerPipeline:
+class ScrapyBookCrawlerPipeline:
     def process_item(self, item, spider):
         return item

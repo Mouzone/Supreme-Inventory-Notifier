@@ -11,7 +11,7 @@ Project Part 1 (Simple Scrape)
         - then check each page's "product-button-wrap bpS-mt-7" and what the first div is for sold out
     - log into array as class of item
 - output as csv when done
-- oputput in accessible twitter format
+- output in accessible twitter format
 
 
 

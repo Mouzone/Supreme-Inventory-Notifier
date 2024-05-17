@@ -1,4 +1,4 @@
-# Scrapy settings for scrapy_crawler project
+# Scrapy settings for scrapy_book_crawler project
 #
 # For simplicity, this file contains only settings considered important or
 # commonly used. You can find more settings consulting the documentation:
@@ -7,14 +7,14 @@
 #     https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #     https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 
-BOT_NAME = "scrapy_crawler"
+BOT_NAME = "scrapy_book_crawler"
 
-SPIDER_MODULES = ["scrapy_crawler.spiders"]
-NEWSPIDER_MODULE = "scrapy_crawler.spiders"
+SPIDER_MODULES = ["scrapy_book_crawler.spiders"]
+NEWSPIDER_MODULE = "scrapy_book_crawler.spiders"
 
 
 # Crawl responsibly by identifying yourself (and your website) on the user-agent
-#USER_AGENT = "scrapy_crawler (+http://www.yourdomain.com)"
+#USER_AGENT = "scrapy_book_crawler (+http://www.yourdomain.com)"
 
 # Obey robots.txt rules
 ROBOTSTXT_OBEY = True
@@ -45,13 +45,13 @@ ROBOTSTXT_OBEY = True
 # Enable or disable spider middlewares
 # See https://docs.scrapy.org/en/latest/topics/spider-middleware.html
 #SPIDER_MIDDLEWARES = {
-#    "scrapy_crawler.middlewares.ScrapyCrawlerSpiderMiddleware": 543,
+#    "scrapy_book_crawler.middlewares.ScrapyBookCrawlerSpiderMiddleware": 543,
 #}
 
 # Enable or disable downloader middlewares
 # See https://docs.scrapy.org/en/latest/topics/downloader-middleware.html
 #DOWNLOADER_MIDDLEWARES = {
-#    "scrapy_crawler.middlewares.ScrapyCrawlerDownloaderMiddleware": 543,
+#    "scrapy_book_crawler.middlewares.ScrapyBookCrawlerDownloaderMiddleware": 543,
 #}
 
 # Enable or disable extensions
@@ -63,7 +63,7 @@ ROBOTSTXT_OBEY = True
 # Configure item pipelines
 # See https://docs.scrapy.org/en/latest/topics/item-pipeline.html
 #ITEM_PIPELINES = {
-#    "scrapy_crawler.pipelines.ScrapyCrawlerPipeline": 300,
+#    "scrapy_book_crawler.pipelines.ScrapyBookCrawlerPipeline": 300,
 #}
 
 # Enable and configure the AutoThrottle extension (disabled by default)
@@ -102,3 +102,4 @@ PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT = (
 )
 
 PLAYWRIGHT_BROWSER_TYPE = "chromium"
+
