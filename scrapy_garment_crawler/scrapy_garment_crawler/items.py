@@ -6,9 +6,10 @@
 import scrapy
 
 class Garment(scrapy.Item):
-    link = scrapy.Field()
-    # product_title = scrapy.Field()
-    # variant = scrapy.Field()
+    # link = scrapy.Field()
+    # image = scrapy.Field()
+    product = scrapy.Field()
+    variant = scrapy.Field()
     # size = scrapy.Field()
-    # price = scrapy.Field()
+    price = scrapy.Field()
     # sold_out = scrapy.Field()

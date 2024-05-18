@@ -102,3 +102,21 @@ PLAYWRIGHT_DEFAULT_NAVIGATION_TIMEOUT = (
 )
 
 PLAYWRIGHT_BROWSER_TYPE = "chromium"
+
+# Set download delay
+DOWNLOAD_DELAY = 1  # Initial download delay, random delays are handled in middleware
+
+# Configure a delay for requests for the same website (default: 0)
+CONCURRENT_REQUESTS_PER_DOMAIN = 2
+
+# Enable AutoThrottle to dynamically set delays
+AUTOTHROTTLE_ENABLED = True
+AUTOTHROTTLE_START_DELAY = 5
+AUTOTHROTTLE_MAX_DELAY = 60
+AUTOTHROTTLE_TARGET_CONCURRENCY = 1.0
+AUTOTHROTTLE_DEBUG = False
+
+# Proxy settings
+HTTPPROXY_ENABLED = True
+
+USER_AGENT = 'Mozilla/5.0 (Windows NT 10.0; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36'
