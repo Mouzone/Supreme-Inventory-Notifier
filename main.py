@@ -1,6 +1,6 @@
 from requests_html import HTMLSession
 
-
+# rewrite using async
 def scrape_items():
     r = session.get("https://us.supreme.com/collections/all")
     r.html.render(sleep=1, keep_page=True, scrolldown=1)
@@ -17,11 +17,13 @@ def scrape_item(title, url):
     r.html.render(sleep=1, keep_page=True, scrolldown=1)
 
     image_link = r.html.find("div.swiper-slide-active > img.js-product-image", first=True).attrs["src"]
-    print(image_link)
+    variant = r.html.find("h1.product-title + div + div > div", first=True).text
+    print(variant)
     # get variant
     # get sizes (scrape from dropdown)
     # get price (same for all sizes
 
+    # write it to csv file with image_link, variant, sizes, price, link
 
 session = HTMLSession()
 scrape_items()
