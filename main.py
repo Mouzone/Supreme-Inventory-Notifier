@@ -6,19 +6,18 @@ import asyncio
 # file_lock = asyncio.Lock()
 
 
-async def scrape_items(asession):
+async def scrape_items():
     try:
         r = await asession.get("https://us.supreme.com/collections/all")
         await r.html.arender()
-
-        items = r.html.find("ul.collection-ul > li > a")
+        items_elements = r.html.find("ul.collection-ul > li > a")
+        items = [(element.attrs["data-cy-title"], element.attrs["href"]) for element in items_elements]
         return items
-
     except Exception as e:
         print(f"Error in scrape_items: {e}")
 
 
-async def scrape_item(asession, title, url):
+async def scrape_item(title, url):
     BASE_URL = "https://us.supreme.com"
     try:
         r = await asession.get(BASE_URL + url)
@@ -54,12 +53,13 @@ async def scrape_item(asession, title, url):
 #         except Exception as e:
 #             print(f"Error in write_to_json: {e}")
 
-async def main():
-    asession = AsyncHTMLSession()
-    items = await scrape_items(asession)
-    return items
-    # tasks = (scrape_item(asession, item.attrs["data-cy-title"], item.attrs["href"]) for item in items)
-    # return await asyncio.gather(*tasks)
 
-results = asyncio.run(main())
+# tasks = (scrape_item(asession, item.attrs["data-cy-title"], item.attrs["href"]) for item in items)
+# return await asyncio.gather(*tasks)
+
+asession = AsyncHTMLSession()
+items = asession.run(scrape_items)
+
+# rewrite this to run with function mains
+results = asession.run(*[scrape_item(pair[0], pair[1]) for pair in items])
 print(results)
