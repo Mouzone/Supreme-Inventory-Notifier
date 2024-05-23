@@ -16,18 +16,14 @@ def scrape_item(title, url):
     r = session.get(url)
     r.html.render(sleep=1, keep_page=True, scrolldown=1)
 
-
-    image_link = r.html.find("div.swiper-slide-active > img.js-product-image", first=True).attrs["src"]
-    variant = r.html.find("h1.product-title + div + div > div", first=True).text
-    price = r.html.find("div[data-cy=product-price]", first=True).text
-
-    sizes_html = r.html.find("select > option")
-    sizes = [element.text for element in sizes_html]
-
     add_to_cart_classes = r.html.find("div.js-add-to-cart", first=True).attrs['class']
     in_stock = "display-none" not in add_to_cart_classes
-
-    print((image_link, variant, price, sizes, in_stock))
+    if in_stock:
+        image_link = r.html.find("div.swiper-slide-active > img.js-product-image", first=True).attrs["src"]
+        variant = r.html.find("h1.product-title + div + div > div", first=True).text
+        price = r.html.find("div[data-cy=product-price]", first=True).text
+        sizes_html = r.html.find("select > option")
+        sizes = [element.text for element in sizes_html]
 
 # write it to csv file with image_link, variant, sizes, price, link
 def write_to_csv():
