@@ -57,6 +57,7 @@ async def scrape_item(title, url):
 # tasks = (scrape_item(asession, item.attrs["data-cy-title"], item.attrs["href"]) for item in items)
 # return await asyncio.gather(*tasks)
 
+# make it grab from a queue and run without a function call
 asession = AsyncHTMLSession()
 items = asession.run(scrape_items)
 
