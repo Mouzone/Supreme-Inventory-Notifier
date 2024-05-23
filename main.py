@@ -1,36 +1,65 @@
-from requests_html import HTMLSession
+from requests_html import AsyncHTMLSession
+import json
+import asyncio
 
-# rewrite using async
-def scrape_items():
-    r = session.get("https://us.supreme.com/collections/all")
-    r.html.render(sleep=1, keep_page=True, scrolldown=1)
-
-    items = r.html.find("ul.collection-ul > li > a")
-    for item in items:
-        title = item.attrs["data-cy-title"]
-        link = "https://us.supreme.com" + item.attrs["href"]
-        scrape_item(title, link)
+# # Create a global lock for file access
+# file_lock = asyncio.Lock()
 
 
-def scrape_item(title, url):
-    r = session.get(url)
-    r.html.render(sleep=1, keep_page=True, scrolldown=1)
+async def scrape_items(asession):
+    try:
+        r = await asession.get("https://us.supreme.com/collections/all")
+        await r.html.arender()
 
-    add_to_cart_classes = r.html.find("div.js-add-to-cart", first=True).attrs['class']
-    in_stock = "display-none" not in add_to_cart_classes
-    if in_stock:
+        items = r.html.find("ul.collection-ul > li > a")
+        return items
+
+    except Exception as e:
+        print(f"Error in scrape_items: {e}")
+
+
+async def scrape_item(asession, title, url):
+    BASE_URL = "https://us.supreme.com"
+    try:
+        r = await asession.get(BASE_URL + url)
+        await r.html.arender()
+
         image_link = r.html.find("div.swiper-slide-active > img.js-product-image", first=True).attrs["src"]
         variant = r.html.find("h1.product-title + div + div > div", first=True).text
         price = r.html.find("div[data-cy=product-price]", first=True).text
         sizes_html = r.html.find("select > option")
         sizes = [element.text for element in sizes_html]
+        add_to_cart_classes = r.html.find("div.js-add-to-cart", first=True).attrs['class']
+        in_stock = "display-none" not in add_to_cart_classes
+        garment = {
+            "title": title,
+            "image_link": image_link,
+            "variant": variant,
+            "price": price,
+            "sizes": sizes,
+            "in_stock": in_stock
+        }
+        return garment
+        # await write_to_json(garment)
+    except Exception as e:
+        print(f"Error in scrape_item for {title}: {e}")
+#
+# # Write garment data to JSON
+# async def write_to_json(garment):
+#     async with file_lock:  # Ensure file access is synchronized
+#         try:
+#             with open("output.json", "a") as outfile:
+#                 json.dump(garment, outfile)
+#                 outfile.write("\n")  # Ensure each entry is on a new line
+#         except Exception as e:
+#             print(f"Error in write_to_json: {e}")
 
-# write it to csv file with image_link, variant, sizes, price, link
-def write_to_csv():
-    pass
+async def main():
+    asession = AsyncHTMLSession()
+    items = await scrape_items(asession)
+    return items
+    # tasks = (scrape_item(asession, item.attrs["data-cy-title"], item.attrs["href"]) for item in items)
+    # return await asyncio.gather(*tasks)
 
-session = HTMLSession()
-scrape_items()
-
-
-
+results = asyncio.run(main())
+print(results)
