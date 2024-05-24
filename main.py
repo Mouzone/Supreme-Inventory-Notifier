@@ -1,6 +1,6 @@
 from requests_html import AsyncHTMLSession
 import collections
-
+import json
 
 async def scrape_items():
     try:
@@ -12,7 +12,7 @@ async def scrape_items():
         items_elements = r.html.find("ul.collection-ul > li > a")
         print(f"Finish collecting links")
         links = collections.deque([(element.attrs["data-cy-title"], element.attrs["href"]) for element in items_elements])
-        garments = collections.deque()
+        garments = []
         print(f"{len(links)} links to scrape")
 
         while links:
@@ -52,9 +52,17 @@ async def scrape_item(title, url):
                 "sizes": sizes,
                 "in_stock": in_stock
                 }
+
     except Exception as e:
         print(f"Error in scrape_item for {title}: {e}")
 
+
 asession = AsyncHTMLSession()
 items = asession.run(scrape_items)
-print(items[0])
+
+with open("output.json", "w") as json_file:
+    json_output = json.dumps(items[0])
+    json_file.write(json_output)
+
+print("JSON data has been written to 'output.json' file.")
+
