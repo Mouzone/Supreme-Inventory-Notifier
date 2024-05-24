@@ -15,9 +15,9 @@ async def scrape_items():
         garments = collections.deque()
         print(f"{len(links)} links to scrape")
 
+        # try rewriting with gather possibly?
         while links:
             title, link = links.pop()
-            print(f"Scraping: {title}")
             result = await scrape_item(title, link)
             print(f"Finished Scraping: {title, result["variant"]}")
             garments.append(result)
