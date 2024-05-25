@@ -1,3 +1,3 @@
 - when appending check if item already exists in supreme_items
--- other table should be fine 
+-- other table should be fine, figure out a way to first check by calling if item_name exists, if it does grab the item_id 
 - refactor code into separate files that call the scraping function and writing into database as speerate
