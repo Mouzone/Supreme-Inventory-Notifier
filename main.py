@@ -3,7 +3,6 @@ import os
 
 from google.cloud.sql.connector import Connector, IPTypes
 import pymysql
-
 import sqlalchemy
 
 async def scrape_items():

@@ -1,1 +1,3 @@
-- refactor code into speerate files that call the scraping function and writing into database as speerate
+- when appending check if item already exists in supreme_items
+-- other table should be fine 
+- refactor code into separate files that call the scraping function and writing into database as speerate
