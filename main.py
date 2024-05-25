@@ -1,5 +1,4 @@
 from requests_html import AsyncHTMLSession
-from main import scrape_items
 
 # database imports
 from google.cloud.sql.connector import Connector, IPTypes
@@ -80,44 +79,41 @@ async def scrape_item(title, url):
         sizes_html = r.html.find("select > option")
         sizes = [element.text for element in sizes_html]
 
+        add_to_cart_classes = r.html.find("div.js-add-to-cart", first=True).attrs['class']
+        in_stock = "display-none" not in add_to_cart_classes
         # connect to database and write the entry
-        conn = pool.connect()
-        try:
-            item_insert_stmt = sqlalchemy.text(
-                "INSERT INTO supreme_items (title, price, url) VALUES (:title, :price, :url)",
-            )
-            result = conn.execute(item_insert_stmt, parameters={"title": title, "price": price, "url": url})
-            item_id = result.inserted_primary_key[0]
+        if not in_stock:
+            conn = pool.connect()
+            try:
+                # before adding check that the item was not already added
+                # if so then just grab the result's key
+                item_insert_stmt = sqlalchemy.text(
+                    "INSERT INTO supreme_items (title, price, url) VALUES (:title, :price, :url)",
+                )
+                result = conn.execute(item_insert_stmt, parameters={"title": title, "price": price, "url": url})
+                item_id = result.inserted_primary_key[0]
 
-            variant_insert_stmt = sqlalchemy.text(
-                "INSERT INTO supreme_variants (item_id, variant, img_link) VALUES (:item_id, :variant, :img_link)"
-            )
-            result = conn.execute(variant_insert_stmt, parameters={"item_id": item_id, "variant": variant, "img_link":img_link})
-            variant_id = result.inserted_primary_key[0]
+                variant_insert_stmt = sqlalchemy.text(
+                    "INSERT INTO supreme_variants (item_id, variant, img_link) VALUES (:item_id, :variant, :img_link)"
+                )
+                result = conn.execute(variant_insert_stmt, parameters={"item_id": item_id, "variant": variant, "img_link":img_link})
+                variant_id = result.inserted_primary_key[0]
 
-            size_insert_stmt = sqlalchemy.text(
-                "INSERT INTO supreme_sizes (item_id, variant_id, size) VALUES (:item_id, :variant_id, :size)"
-            )
-            for size in sizes:
-                result = conn.execute(size_insert_stmt, parameters={"item_id":item_id, "variant_id":variant_id, "size":size})
-            conn.commit()
-            print(f"-Transaction for {title, variant} committed successfully.")
-        except Exception as e:
-            # Rollback the transaction in case of an error
-            conn.rollback()
-            print(f"Error executing transaction for {title, variant}: {e}")
-        finally:
-            # Return the connection to the pool
-            conn.close()
-        return {
-                "title": title,
-                "image_link": image_link,
-                "variant": variant,
-                "price": price,
-                "sizes": sizes,
-                "in_stock": in_stock,
-                "url": url
-                }
+                size_insert_stmt = sqlalchemy.text(
+                    "INSERT INTO supreme_sizes (item_id, variant_id, size) VALUES (:item_id, :variant_id, :size)"
+                )
+                for size in sizes:
+                    conn.execute(size_insert_stmt, parameters={"item_id":item_id, "variant_id":variant_id, "size":size})
+                conn.commit()
+                print(f"-Transaction for {title, variant} committed successfully.")
+
+            except Exception as e:
+                # Rollback the transaction in case of an error
+                conn.rollback()
+                print(f"Error executing transaction for {title, variant}: {e}")
+            finally:
+                # Return the connection to the pool
+                conn.close()
 
     except Exception as e:
         print(f"Error in scrape_item for {title, url}: {e}")
