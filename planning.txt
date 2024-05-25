@@ -1,0 +1,1 @@
+- refactor code into speerate files that call the scraping function and writing into database as speerate
