@@ -1,9 +1,43 @@
 from requests_html import AsyncHTMLSession
+from main import scrape_items
+
+# database imports
+from google.cloud.sql.connector import Connector, IPTypes
+from sqlalchemy.pool import QueuePool
+import sqlalchemy
+import pymysql
 import os
 
-from google.cloud.sql.connector import Connector, IPTypes
-import pymysql
-import sqlalchemy
+
+def connect_with_connector() -> sqlalchemy.engine.base.Engine:
+    instance_connection_name = os.environ.get("INSTANCE_CONNECTION_NAME")
+    db_user = os.environ.get("DB_USER")
+    db_pass = os.environ.get("DB_PASS")
+    db_name = os.environ.get("DB_NAME")
+
+    ip_type = IPTypes.PRIVATE if os.environ.get("PRIVATE_IP") else IPTypes.PUBLIC
+
+    connector = Connector(ip_type)
+
+    def getconn() -> pymysql.connections.Connection:
+        conn: pymysql.connections.Connection = connector.connect(
+            instance_connection_name,
+            "pymysql",
+            user=db_user,
+            password=db_pass,
+            db=db_name,
+        )
+        return conn
+
+    pool = sqlalchemy.create_engine(
+        "mysql+pymysql://",
+        creator=getconn,
+        poolclass=QueuePool,
+        pool_size=200,
+    )
+
+    print("Database connection established successfully.")
+    return pool
 
 async def scrape_items():
     try:
@@ -40,14 +74,41 @@ async def scrape_item(title, url):
         await r.html.arender(sleep=1)
         print(f"--Opened: {title}")
 
-        image_link = r.html.find("div.swiper-slide-active > img.js-product-image", first=True).attrs["src"]
+        img_link = r.html.find("div.swiper-slide-active > img.js-product-image", first=True).attrs["src"]
         variant = r.html.find("h1.product-title + div + div > div", first=True).text
         price = r.html.find("div[data-cy=product-price]", first=True).text
         sizes_html = r.html.find("select > option")
         sizes = [element.text for element in sizes_html]
-        add_to_cart_classes = r.html.find("div.js-add-to-cart", first=True).attrs['class']
-        in_stock = "display-none" not in add_to_cart_classes
-        # connect to database hopefully async and write the entry
+
+        # connect to database and write the entry
+        conn = pool.connect()
+        try:
+            item_insert_stmt = sqlalchemy.text(
+                "INSERT INTO supreme_items (title, price, url) VALUES (:title, :price, :url)",
+            )
+            result = conn.execute(item_insert_stmt, parameters={"title": title, "price": price, "url": url})
+            item_id = result.inserted_primary_key[0]
+
+            variant_insert_stmt = sqlalchemy.text(
+                "INSERT INTO supreme_variants (item_id, variant, img_link) VALUES (:item_id, :variant, :img_link)"
+            )
+            result = conn.execute(variant_insert_stmt, parameters={"item_id": item_id, "variant": variant, "img_link":img_link})
+            variant_id = result.inserted_primary_key[0]
+
+            size_insert_stmt = sqlalchemy.text(
+                "INSERT INTO supreme_sizes (item_id, variant_id, size) VALUES (:item_id, :variant_id, :size)"
+            )
+            for size in sizes:
+                result = conn.execute(size_insert_stmt, parameters={"item_id":item_id, "variant_id":variant_id, "size":size})
+            conn.commit()
+            print(f"-Transaction for {title, variant} committed successfully.")
+        except Exception as e:
+            # Rollback the transaction in case of an error
+            conn.rollback()
+            print(f"Error executing transaction for {title, variant}: {e}")
+        finally:
+            # Return the connection to the pool
+            conn.close()
         return {
                 "title": title,
                 "image_link": image_link,
@@ -62,47 +123,6 @@ async def scrape_item(title, url):
         print(f"Error in scrape_item for {title, url}: {e}")
 
 
+pool = connect_with_connector()
 asession = AsyncHTMLSession()
 items = asession.run(scrape_items)
-
-def connect_with_connector() -> sqlalchemy.engine.base.Engine:
-    """
-    Initializes a connection pool for a Cloud SQL instance of MySQL.
-
-    Uses the Cloud SQL Python Connector package.
-    """
-    # Note: Saving credentials in environment variables is convenient, but not
-    # secure - consider a more secure solution such as
-    # Cloud Secret Manager (https://cloud.google.com/secret-manager) to help
-    # keep secrets safe.
-
-    instance_connection_name = os.environ[
-        "INSTANCE_CONNECTION_NAME"
-    ]  # e.g. 'project:region:instance'
-    db_user = os.environ["DB_USER"]  # e.g. 'my-db-user'
-    db_pass = os.environ["DB_PASS"]  # e.g. 'my-db-password'
-    db_name = os.environ["DB_NAME"]  # e.g. 'my-database'
-
-    ip_type = IPTypes.PRIVATE if os.environ.get("PRIVATE_IP") else IPTypes.PUBLIC
-
-    connector = Connector(ip_type)
-
-    def getconn() -> pymysql.connections.Connection:
-        conn: pymysql.connections.Connection = connector.connect(
-            instance_connection_name,
-            "pymysql",
-            user=db_user,
-            password=db_pass,
-            db=db_name,
-        )
-        return conn
-
-    pool = sqlalchemy.create_engine(
-        "mysql+pymysql://",
-        creator=getconn,
-        # ...
-    )
-    return pool
-
-print("JSON data has been written to 'output.json' file.")
-
