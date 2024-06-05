@@ -28,7 +28,7 @@ def getconn() -> pymysql.connections.Connection:
     )
     return conn
 
-pool = sqlalchemy.create_engine(
+pool = create_engine(
     "mysql+pymysql://",
     creator=getconn,
     poolclass=QueuePool,
