@@ -35,8 +35,19 @@ def connect_with_connector() -> sqlalchemy.engine.base.Engine:
         pool_size=200,
     )
 
-    print("Database connection established successfully.")
+    try:
+        with pool.connect() as conn:
+            result = conn.execute("SELECT 1")
+            if result.scalar() == 1:
+                print("Database connection established successfully.")
+            else:
+                print("Test query did not return expected result.")
+    except Exception as e:
+        print(f"Error establishing database connection: {e}")
+        raise
+    
     return pool
+
 
 async def scrape_items():
     try:
@@ -48,19 +59,16 @@ async def scrape_items():
         items_elements = r.html.find("ul.collection-ul > li > a")
         print(f"-Finish collecting links")
         links = [(element.attrs["data-cy-title"], element.attrs["href"]) for element in items_elements]
-        garments = []
         print(f"{len(links)} links to scrape")
 
         while links:
             title, link = links.pop()
             print(f"-Scraping: {title}")
-            result = await scrape_item(title, link)
-            print(f"-Finished Scraping: {title, result["variant"]}")
-            garments.append(result)
-            print(f"{len(garments)} links scraped")
+            await scrape_item(title, link)
+            print(f"-Finished Scraping: {title}")
+            print(f"{len(links)} links left to scrape")
 
         print("Finished Scraping All")
-        return garments
     except Exception as e:
         print(f"Error in scrape_items: {e}")
 
@@ -75,44 +83,56 @@ async def scrape_item(title, url):
 
         img_link = r.html.find("div.swiper-slide-active > img.js-product-image", first=True).attrs["src"]
         variant = r.html.find("h1.product-title + div + div > div", first=True).text
-        price = r.html.find("div[data-cy=product-price]", first=True).text
+        price = r.html.find("div[data-cy=product-price]", first=True).text.replace("$", "")
         sizes_html = r.html.find("select > option")
         sizes = [element.text for element in sizes_html]
 
         add_to_cart_classes = r.html.find("div.js-add-to-cart", first=True).attrs['class']
         in_stock = "display-none" not in add_to_cart_classes
+        print(f"--Found all elements: {title}")
+
         # connect to database and write the entry
-        if not in_stock:
+        if in_stock:
+            print(f"---Connecting to Pool")
             conn = pool.connect()
+            print(f"---{title, variant} adding to database")
             try:
                 # before adding check that the item was not already added
+                item_select_stmt = sqlalchemy.text("SELECT id FROM supreme_items WHERE title = :title")
+                result = conn.execute(item_select_stmt, {"title": title})
+                existing_item = result.fetchone()
+
                 # if so then just grab the result's key
-                item_insert_stmt = sqlalchemy.text(
-                    "INSERT INTO supreme_items (title, price, url) VALUES (:title, :price, :url)",
-                )
-                result = conn.execute(item_insert_stmt, parameters={"title": title, "price": price, "url": url})
-                item_id = result.inserted_primary_key[0]
+                if existing_item:
+                    item_id = existing_item.inserted_primary_key[0]
+                else:
+                    # If the item does not exist, insert it
+                    item_insert_stmt = sqlalchemy.text(
+                        "INSERT INTO supreme_items (title, price, url) VALUES (:title, :price, :url)"
+                    )
+                    result = conn.execute(item_insert_stmt, {"title": title, "price": price, "url": url})
+                    item_id = result.inserted_primary_key[0]
 
                 variant_insert_stmt = sqlalchemy.text(
                     "INSERT INTO supreme_variants (item_id, variant, img_link) VALUES (:item_id, :variant, :img_link)"
                 )
-                result = conn.execute(variant_insert_stmt, parameters={"item_id": item_id, "variant": variant, "img_link":img_link})
+                result = conn.execute(variant_insert_stmt, parameters={"item_id": item_id, "variant": variant, "img_link": img_link})
                 variant_id = result.inserted_primary_key[0]
 
                 size_insert_stmt = sqlalchemy.text(
                     "INSERT INTO supreme_sizes (item_id, variant_id, size) VALUES (:item_id, :variant_id, :size)"
                 )
                 for size in sizes:
-                    conn.execute(size_insert_stmt, parameters={"item_id":item_id, "variant_id":variant_id, "size":size})
+                    conn.execute(size_insert_stmt, parameters={"item_id": item_id, "variant_id": variant_id, "size": size})
+
                 conn.commit()
                 print(f"-Transaction for {title, variant} committed successfully.")
 
             except Exception as e:
-                # Rollback the transaction in case of an error
                 conn.rollback()
                 print(f"Error executing transaction for {title, variant}: {e}")
+
             finally:
-                # Return the connection to the pool
                 conn.close()
 
     except Exception as e:
@@ -121,4 +141,4 @@ async def scrape_item(title, url):
 
 pool = connect_with_connector()
 asession = AsyncHTMLSession()
-items = asession.run(scrape_items)
+asession.run(scrape_items)
