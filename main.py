@@ -3,22 +3,22 @@ from google.cloud.sql.connector import Connector, IPTypes
 from sqlalchemy.pool import QueuePool
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, MetaData, Table, insert, select
-import sqlalchemy
 import pymysql
 import os
 
-load_dotenv()
-
-# Create a connection pool
-instance_connection_name = os.environ.get("INSTANCE_CONNECTION_NAME")
-db_user = os.environ.get("DB_USER")
-db_pass = os.environ.get("DB_PASS")
-db_name = os.environ.get("DB_NAME")
-ip_type = IPTypes.PRIVATE if os.environ.get("PRIVATE_IP") else IPTypes.PUBLIC
-
-connector = Connector(ip_type)
 
 def getconn() -> pymysql.connections.Connection:
+    load_dotenv()
+
+    # Create a connection pool
+    instance_connection_name = os.environ.get("INSTANCE_CONNECTION_NAME")
+    db_user = os.environ.get("DB_USER")
+    db_pass = os.environ.get("DB_PASS")
+    db_name = os.environ.get("DB_NAME")
+    ip_type = IPTypes.PRIVATE if os.environ.get("PRIVATE_IP") else IPTypes.PUBLIC
+
+    connector = Connector(ip_type)
+
     conn: pymysql.connections.Connection = connector.connect(
         instance_connection_name,
         "pymysql",
@@ -28,12 +28,6 @@ def getconn() -> pymysql.connections.Connection:
     )
     return conn
 
-pool = create_engine(
-    "mysql+pymysql://",
-    creator=getconn,
-    poolclass=QueuePool,
-    pool_size=200,
-)
 
 async def scrape_items():
     try:
@@ -42,6 +36,9 @@ async def scrape_items():
         await r.html.arender()
         print(f"-Finish rendering home")
 
+        pool = create_engine("mysql+pymysql://", creator=getconn, poolclass=QueuePool, pool_size=200,)
+        await clear_tables(pool)
+
         items_elements = r.html.find("ul.collection-ul > li > a")
         print(f"-Finish collecting links")
         links = [(element.attrs["data-cy-title"], element.attrs["href"]) for element in items_elements]
@@ -49,16 +46,34 @@ async def scrape_items():
 
         while links:
             title, link = links.pop()
+            title = title.replace("®", "")
             print(f"-Scraping: {title}")
-            await scrape_item(title, link)
+            await scrape_item(pool, title, link)
             print(f"-Finished Scraping: {title}")
             print(f"{len(links)} links left to scrape")
 
         print("Finished Scraping All")
+
     except Exception as e:
         print(f"Error in scrape_items: {e}")
 
-async def scrape_item(title, url):
+
+async def clear_tables(pool):
+    conn = pool.connect()
+
+    metadata = MetaData()
+    supreme_items = Table('supreme_items', metadata, autoload_with=conn)
+    supreme_variants = Table('supreme_variants', metadata, autoload_with=conn)
+    supreme_sizes = Table('supreme_sizes', metadata, autoload_with=conn)
+
+    conn.execute(supreme_items.delete())
+    conn.execute(supreme_variants.delete())
+    conn.execute(supreme_sizes.delete())
+
+    conn.commit()
+    return
+
+async def scrape_item(pool, title, url):
     BASE_URL = "https://us.supreme.com"
     try:
         print(f"--Opening: {title}")
@@ -79,45 +94,51 @@ async def scrape_item(title, url):
         # connect to database and write the entry
         if in_stock:
             print(f"---{title, variant} adding to database")
-            try:
-                conn = pool.connect()
-
-                metadata = MetaData()
-                supreme_items = Table('supreme_items', metadata, autoload_with=conn)
-                supreme_variants = Table('supreme_variants', metadata, autoload_with=conn)
-                supreme_sizes = Table('supreme_sizes', metadata, autoload_with=conn)
-
-                stmt = select(supreme_items).where(supreme_items.c.title == title)
-                result = conn.execute(stmt)
-                row = result.fetchone()
-
-                if row:
-                    item_id = row[0]
-                else:
-                    item_insert_stmt = insert(supreme_items).values(title=title, price=price, url=url)
-                    result = conn.execute(item_insert_stmt)
-                    item_id = result.inserted_primary_key[0]
-
-                variant_insert_stmt = insert(supreme_variants).values(item_id=item_id, variant=variant, img_link=img_link)
-                result = conn.execute(variant_insert_stmt)
-                variant_id = result.inserted_primary_key[0]
-
-                for size in sizes:
-                    size_insert_stmt = insert(supreme_sizes).values(item_id=item_id, variant_id=variant_id, size=size)
-                    conn.execute(size_insert_stmt)
-
-                conn.commit()
-                print(f"-Transaction for {title, variant} committed successfully.")
-
-            except Exception as e:
-                print(f"Error executing transaction for {title, variant}: {e}")
-
-            finally:
-                conn.close()
+            await write_to_db(pool, title, price, url, variant, img_link, sizes)
         else:
             print(f"---{title, variant} not in stock")
+
     except Exception as e:
         print(f"Error in scrape_item for {title, url}: {e}")
+
+
+async def write_to_db(pool, title, price, url, variant, img_link, sizes):
+    try:
+        conn = pool.connect()
+
+        metadata = MetaData()
+        supreme_items = Table('supreme_items', metadata, autoload_with=conn)
+        supreme_variants = Table('supreme_variants', metadata, autoload_with=conn)
+        supreme_sizes = Table('supreme_sizes', metadata, autoload_with=conn)
+
+        stmt = select(supreme_items).where(supreme_items.c.title == title)
+        result = conn.execute(stmt)
+        row = result.fetchone()
+
+        if row:
+            item_id = row[0]
+        else:
+            item_insert_stmt = insert(supreme_items).values(title=title, price=price, url=url)
+            result = conn.execute(item_insert_stmt)
+            item_id = result.inserted_primary_key[0]
+
+        variant_insert_stmt = insert(supreme_variants).values(item_id=item_id, variant=variant, img_link=img_link)
+        result = conn.execute(variant_insert_stmt)
+        variant_id = result.inserted_primary_key[0]
+
+        for size in sizes:
+            size_insert_stmt = insert(supreme_sizes).values(item_id=item_id, variant_id=variant_id, size=size)
+            conn.execute(size_insert_stmt)
+
+        conn.commit()
+        print(f"-Transaction for {title, variant} committed successfully.")
+
+    except Exception as e:
+        print(f"Error executing transaction for {title, variant}: {e}")
+
+    finally:
+        conn.close()
+
 
 asession = AsyncHTMLSession()
 asession.run(scrape_items)
