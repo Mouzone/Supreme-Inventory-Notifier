@@ -8,6 +8,10 @@ import os
 
 
 def getconn() -> pymysql.connections.Connection:
+    '''
+    Access database credentials from .env file and create connection object
+    :return:
+    '''
     load_dotenv()
 
     # Create a connection pool
@@ -30,6 +34,10 @@ def getconn() -> pymysql.connections.Connection:
 
 
 async def scrape_items():
+    '''
+    Scrape from supreme home page each item and respective link, will then have variants and other data scraped
+    :return:
+    '''
     try:
         print(f"-Start rendering home")
         r = await asession.get("https://us.supreme.com/collections/all")
@@ -59,6 +67,11 @@ async def scrape_items():
 
 
 async def clear_tables(pool):
+    '''
+    From each table remove all rows
+    :param pool:
+    :return:
+    '''
     conn = pool.connect()
 
     metadata = MetaData()
@@ -73,7 +86,15 @@ async def clear_tables(pool):
     conn.commit()
     return
 
+
 async def scrape_item(pool, title, url):
+    '''
+    For each item scrape pertinent information and write to database
+    :param pool:
+    :param title:
+    :param url:
+    :return:
+    '''
     BASE_URL = "https://us.supreme.com"
     try:
         print(f"--Opening: {title}")
@@ -103,6 +124,17 @@ async def scrape_item(pool, title, url):
 
 
 async def write_to_db(pool, title, price, url, variant, img_link, sizes):
+    '''
+    Establish connection to db and insert to each table while getting the id from each table for the next
+    :param pool:
+    :param title:
+    :param price:
+    :param url:
+    :param variant:
+    :param img_link:
+    :param sizes:
+    :return:
+    '''
     try:
         conn = pool.connect()
 
