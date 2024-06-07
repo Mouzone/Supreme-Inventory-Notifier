@@ -150,11 +150,11 @@ async def write_to_db(pool, title, price, url, variant, img_link, sizes):
         if row:
             item_id = row[0]
         else:
-            item_insert_stmt = insert(supreme_items).values(title=title, price=price, url=url)
+            item_insert_stmt = insert(supreme_items).values(title=title, price=price)
             result = conn.execute(item_insert_stmt)
             item_id = result.inserted_primary_key[0]
 
-        variant_insert_stmt = insert(supreme_variants).values(item_id=item_id, variant=variant, img_link=img_link)
+        variant_insert_stmt = insert(supreme_variants).values(item_id=item_id, variant=variant, img_link=img_link, url=url)g
         result = conn.execute(variant_insert_stmt)
         variant_id = result.inserted_primary_key[0]
 

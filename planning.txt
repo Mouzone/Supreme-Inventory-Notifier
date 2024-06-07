@@ -1,2 +1,1 @@
-- add comments
 - write api using fastapi and sqlmodel
