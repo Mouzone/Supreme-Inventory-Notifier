@@ -1,5 +1,4 @@
 from requests_html import AsyncHTMLSession
-from google.cloud.sql.connector import Connector, IPTypes
 from sqlalchemy.pool import QueuePool
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, MetaData, Table, insert, select
@@ -15,21 +14,18 @@ def getconn() -> pymysql.connections.Connection:
     load_dotenv()
 
     # Create a connection pool
-    instance_connection_name = os.environ.get("INSTANCE_CONNECTION_NAME")
+    db_host = '127.0.0.1'
     db_user = os.environ.get("DB_USER")
     db_pass = os.environ.get("DB_PASS")
     db_name = os.environ.get("DB_NAME")
-    ip_type = IPTypes.PRIVATE if os.environ.get("PRIVATE_IP") else IPTypes.PUBLIC
 
-    connector = Connector(ip_type)
-
-    conn: pymysql.connections.Connection = connector.connect(
-        instance_connection_name,
-        "pymysql",
+    conn = pymysql.connect(
+        host=db_host,
         user=db_user,
         password=db_pass,
-        db=db_name,
+        database=db_name,
     )
+
     return conn
 
 
@@ -44,7 +40,7 @@ async def scrape_items():
         await r.html.arender()
         print(f"-Finish rendering home")
 
-        pool = create_engine("mysql+pymysql://", creator=getconn, poolclass=QueuePool, pool_size=200,)
+        pool = create_engine("mysql+pymysql://", creator=getconn, pool_size=130,)
         await clear_tables(pool)
 
         items_elements = r.html.find("ul.collection-ul > li > a")
@@ -53,11 +49,11 @@ async def scrape_items():
         print(f"{len(links)} links to scrape")
 
         while links:
-            title, link = links.pop()
-            title = title.replace("®", "")
-            print(f"-Scraping: {title}")
-            await scrape_item(pool, title, link)
-            print(f"-Finished Scraping: {title}")
+            product, link = links.pop()
+            product = product.replace("®", "")
+            print(f"-Scraping: {product}")
+            await scrape_item(pool, product, link)
+            print(f"-Finished Scraping: {product}")
             print(f"{len(links)} links left to scrape")
 
         print("Finished Scraping All")
@@ -87,20 +83,20 @@ async def clear_tables(pool):
     return
 
 
-async def scrape_item(pool, title, url):
+async def scrape_item(pool, product, url):
     '''
     For each item scrape pertinent information and write to database
     :param pool:
-    :param title:
+    :param product:
     :param url:
     :return:
     '''
     BASE_URL = "https://us.supreme.com"
     try:
-        print(f"--Opening: {title}")
+        print(f"--Opening: {product}")
         r = await asession.get(BASE_URL + url)
         await r.html.arender(sleep=1)
-        print(f"--Opened: {title}")
+        print(f"--Opened: {product}")
 
         img_link = r.html.find("div.swiper-slide-active > img.js-product-image", first=True).attrs["src"]
         variant = r.html.find("h1.product-title + div + div > div", first=True).text
@@ -110,24 +106,24 @@ async def scrape_item(pool, title, url):
 
         add_to_cart_classes = r.html.find("div.js-add-to-cart", first=True).attrs['class']
         in_stock = "display-none" not in add_to_cart_classes
-        print(f"--Found all elements: {title}")
+        print(f"--Found all elements: {product}")
 
         # connect to database and write the entry
         if in_stock:
-            print(f"---{title, variant} adding to database")
-            await write_to_db(pool, title, price, url, variant, img_link, sizes)
+            print(f"---{product, variant} adding to database")
+            await write_to_db(pool, product, price, url, variant, img_link, sizes)
         else:
-            print(f"---{title, variant} not in stock")
+            print(f"---{product, variant} not in stock")
 
     except Exception as e:
-        print(f"Error in scrape_item for {title, url}: {e}")
+        print(f"Error in scrape_item for {product, url}: {e}")
 
 
-async def write_to_db(pool, title, price, url, variant, img_link, sizes):
+async def write_to_db(pool, product, price, url, variant, img_link, sizes):
     '''
     Establish connection to db and insert to each table while getting the id from each table for the next
     :param pool:
-    :param title:
+    :param product:
     :param price:
     :param url:
     :param variant:
@@ -143,18 +139,18 @@ async def write_to_db(pool, title, price, url, variant, img_link, sizes):
         supreme_variants = Table('supreme_variants', metadata, autoload_with=conn)
         supreme_sizes = Table('supreme_sizes', metadata, autoload_with=conn)
 
-        stmt = select(supreme_items).where(supreme_items.c.title == title)
+        stmt = select(supreme_items).where(supreme_items.c.product == product)
         result = conn.execute(stmt)
         row = result.fetchone()
 
         if row:
             item_id = row[0]
         else:
-            item_insert_stmt = insert(supreme_items).values(title=title, price=price)
+            item_insert_stmt = insert(supreme_items).values(product=product, price=price)
             result = conn.execute(item_insert_stmt)
             item_id = result.inserted_primary_key[0]
 
-        variant_insert_stmt = insert(supreme_variants).values(item_id=item_id, variant=variant, img_link=img_link, url=url)g
+        variant_insert_stmt = insert(supreme_variants).values(item_id=item_id, variant=variant, img_link=img_link, url=url)
         result = conn.execute(variant_insert_stmt)
         variant_id = result.inserted_primary_key[0]
 
@@ -163,10 +159,10 @@ async def write_to_db(pool, title, price, url, variant, img_link, sizes):
             conn.execute(size_insert_stmt)
 
         conn.commit()
-        print(f"-Transaction for {title, variant} committed successfully.")
+        print(f"-Transaction for {product, variant} committed successfully.")
 
     except Exception as e:
-        print(f"Error executing transaction for {title, variant}: {e}")
+        print(f"Error executing transaction for {product, variant}: {e}")
 
     finally:
         conn.close()

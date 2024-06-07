@@ -1,1 +1,4 @@
+- rewrite properly using async
+- refactor db commits into smaller transactions
+- find how t odd errors and status printing better
 - write api using fastapi and sqlmodel
