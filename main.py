@@ -1,5 +1,4 @@
 from requests_html import AsyncHTMLSession
-from sqlalchemy.pool import QueuePool
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, MetaData, Table, insert, select
 import pymysql
@@ -7,13 +6,13 @@ import os
 
 
 def getconn() -> pymysql.connections.Connection:
-    '''
-    Access database credentials from .env file and create connection object
-    :return:
-    '''
+    """
+    Access database credentials from .env file and create a connection object.
+    :return: pymysql.connections.Connection object
+    """
     load_dotenv()
 
-    # Create a connection pool
+    # Create a connection using credentials from the .env file
     db_host = '127.0.0.1'
     db_user = os.environ.get("DB_USER")
     db_pass = os.environ.get("DB_PASS")
@@ -30,21 +29,25 @@ def getconn() -> pymysql.connections.Connection:
 
 
 async def scrape_items():
-    '''
-    Scrape from supreme home page each item and respective link, will then have variants and other data scraped
-    :return:
-    '''
+    """
+    Scrape from the Supreme home page each item and its respective link.
+    This will then have variants and other data scraped.
+    :return: None
+    """
+    asession = AsyncHTMLSession()
     try:
-        print(f"-Start rendering home")
+        print("-Start rendering home")
+        # render shopping collection and scrape items to process
         r = await asession.get("https://us.supreme.com/collections/all")
         await r.html.arender()
-        print(f"-Finish rendering home")
+        print("-Finish rendering home")
 
-        pool = create_engine("mysql+pymysql://", creator=getconn, pool_size=130,)
+        # get pool object for connections for future read writes to db
+        pool = create_engine("mysql+pymysql://", creator=getconn, pool_size=130)
         await clear_tables(pool)
 
         items_elements = r.html.find("ul.collection-ul > li > a")
-        print(f"-Finish collecting links")
+        print("-Finish collecting links")
         links = [(element.attrs["data-cy-title"], element.attrs["href"]) for element in items_elements]
         print(f"{len(links)} links to scrape")
 
@@ -52,7 +55,7 @@ async def scrape_items():
             product, link = links.pop()
             product = product.replace("®", "")
             print(f"-Scraping: {product}")
-            await scrape_item(pool, product, link)
+            await scrape_item(pool, product, link, asession)
             print(f"-Finished Scraping: {product}")
             print(f"{len(links)} links left to scrape")
 
@@ -60,14 +63,16 @@ async def scrape_items():
 
     except Exception as e:
         print(f"Error in scrape_items: {e}")
+    finally:
+        await asession.close()
 
 
 async def clear_tables(pool):
-    '''
-    From each table remove all rows
-    :param pool:
-    :return:
-    '''
+    """
+    From each table remove all rows, such that the dbs will only display currently in-stock items
+    :param pool: SQLAlchemy engine pool
+    :return: None
+    """
     conn = pool.connect()
 
     metadata = MetaData()
@@ -75,25 +80,27 @@ async def clear_tables(pool):
     supreme_variants = Table('supreme_variants', metadata, autoload_with=conn)
     supreme_sizes = Table('supreme_sizes', metadata, autoload_with=conn)
 
-    conn.execute(supreme_items.delete())
-    conn.execute(supreme_variants.delete())
     conn.execute(supreme_sizes.delete())
+    conn.execute(supreme_variants.delete())
+    conn.execute(supreme_items.delete())
 
     conn.commit()
-    return
+    conn.close()
 
 
-async def scrape_item(pool, product, url):
-    '''
-    For each item scrape pertinent information and write to database
-    :param pool:
-    :param product:
-    :param url:
-    :return:
-    '''
+async def scrape_item(pool, product, url, asession):
+    """
+    For each item scrape pertinent information and write to the database.
+    :param pool: SQLAlchemy engine pool
+    :param product: Product name
+    :param url: Product URL
+    :param asession: AsyncHTMLSession object
+    :return: None
+    """
     BASE_URL = "https://us.supreme.com"
     try:
         print(f"--Opening: {product}")
+        # render webpage
         r = await asession.get(BASE_URL + url)
         await r.html.arender(sleep=1)
         print(f"--Opened: {product}")
@@ -108,29 +115,29 @@ async def scrape_item(pool, product, url):
         in_stock = "display-none" not in add_to_cart_classes
         print(f"--Found all elements: {product}")
 
-        # connect to database and write the entry
+        # only add to db if in stock
         if in_stock:
-            print(f"---{product, variant} adding to database")
+            print(f"---{product}, {variant} adding to database")
             await write_to_db(pool, product, price, url, variant, img_link, sizes)
         else:
-            print(f"---{product, variant} not in stock")
+            print(f"---{product}, {variant} not in stock")
 
     except Exception as e:
-        print(f"Error in scrape_item for {product, url}: {e}")
+        print(f"Error in scrape_item for {product}, {url}: {e}")
 
 
 async def write_to_db(pool, product, price, url, variant, img_link, sizes):
-    '''
-    Establish connection to db and insert to each table while getting the id from each table for the next
-    :param pool:
-    :param product:
-    :param price:
-    :param url:
-    :param variant:
-    :param img_link:
-    :param sizes:
-    :return:
-    '''
+    """
+    Establish a connection to the database and insert data into each table.
+    :param pool: SQLAlchemy engine pool
+    :param product: Product name
+    :param price: Product price
+    :param url: Product URL
+    :param variant: Product variant
+    :param img_link: Image link
+    :param sizes: List of sizes
+    :return: None
+    """
     try:
         conn = pool.connect()
 
@@ -143,30 +150,38 @@ async def write_to_db(pool, product, price, url, variant, img_link, sizes):
         result = conn.execute(stmt)
         row = result.fetchone()
 
+        # write to supreme_items db
+        # get resulting item_id to write for other tables
         if row:
+            # if this is first time product is added
             item_id = row[0]
         else:
+            # add product to table
             item_insert_stmt = insert(supreme_items).values(product=product, price=price)
             result = conn.execute(item_insert_stmt)
             item_id = result.inserted_primary_key[0]
 
+        # write to supreme_variant
+        # get resulting variant_id for supreme_size table
         variant_insert_stmt = insert(supreme_variants).values(item_id=item_id, variant=variant, img_link=img_link, url=url)
         result = conn.execute(variant_insert_stmt)
         variant_id = result.inserted_primary_key[0]
 
+        # write to supreme_sizes
         for size in sizes:
             size_insert_stmt = insert(supreme_sizes).values(item_id=item_id, variant_id=variant_id, size=size)
             conn.execute(size_insert_stmt)
 
         conn.commit()
-        print(f"-Transaction for {product, variant} committed successfully.")
+        print(f"-Transaction for {product}, {variant} committed successfully.")
 
     except Exception as e:
-        print(f"Error executing transaction for {product, variant}: {e}")
+        print(f"Error executing transaction for {product}, {variant}: {e}")
 
     finally:
         conn.close()
 
 
-asession = AsyncHTMLSession()
-asession.run(scrape_items)
+if __name__ == "__main__":
+    asession = AsyncHTMLSession()
+    asession.run(scrape_items)
