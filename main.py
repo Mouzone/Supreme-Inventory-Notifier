@@ -46,9 +46,9 @@ async def scrape_items():
         pool = create_engine("mysql+pymysql://", creator=getconn, pool_size=130)
         await clear_tables(pool)
 
-        items_elements = r.html.find("ul.collection-ul > li > a")
+        items_elements = r.html.find('ul[data-testid="product-list"] a[data-testid="react-router-link"]')
         print("-Finish collecting links")
-        links = [(element.attrs["data-cy-title"], element.attrs["href"]) for element in items_elements]
+        links = [(element.attrs["aria-label"][:-13], element.attrs["href"]) for element in items_elements]
         print(f"{len(links)} links to scrape")
 
         while links:
@@ -76,13 +76,13 @@ async def clear_tables(pool):
     conn = pool.connect()
 
     metadata = MetaData()
-    supreme_items = Table('supreme_items', metadata, autoload_with=conn)
-    supreme_variants = Table('supreme_variants', metadata, autoload_with=conn)
-    supreme_sizes = Table('supreme_sizes', metadata, autoload_with=conn)
+    items = Table('items', metadata, autoload_with=conn)
+    variants = Table('variants', metadata, autoload_with=conn)
+    sizes = Table('sizes', metadata, autoload_with=conn)
 
-    conn.execute(supreme_sizes.delete())
-    conn.execute(supreme_variants.delete())
-    conn.execute(supreme_items.delete())
+    conn.execute(sizes.delete())
+    conn.execute(variants.delete())
+    conn.execute(items.delete())
 
     conn.commit()
     conn.close()
@@ -105,20 +105,23 @@ async def scrape_item(pool, product, url, asession):
         await r.html.arender(sleep=1)
         print(f"--Opened: {product}")
 
-        img_link = r.html.find("div.swiper-slide-active > img.js-product-image", first=True).attrs["src"]
-        variant = r.html.find("h1.product-title + div + div > div", first=True).text
-        price = r.html.find("div[data-cy=product-price]", first=True).text.replace("$", "")
-        sizes_html = r.html.find("select > option")
-        sizes = [element.text for element in sizes_html]
+        img_link = r.html.find('div[data-testid="ProductCarousel-wrapper"] img', first=True).attrs["src"]
+        title_with_variant = r.html.find('div[data-testid="ProductCarousel-wrapper"] img', first=True).attrs["alt"]
+        variant = ""
+        if len(title_with_variant) == 2:
+            variant = title_with_variant.split("-").strip()[1]
+        price = r.html.find('h3[data-testid="price"]', first=True).text.replace("$", "")
+        sizes_html = r.html.find('select[aria-label="size"] option')
+        clothes_sizes = [element.text for element in sizes_html]
 
-        add_to_cart_classes = r.html.find("div.js-add-to-cart", first=True).attrs['class']
-        in_stock = "display-none" not in add_to_cart_classes
+        sold_out_button = r.html.find('button[data-testid="sold-out-button"]')
+        in_stock = len(sold_out_button) == 0
         print(f"--Found all elements: {product}")
 
         # only add to db if in stock
         if in_stock:
             print(f"---{product}, {variant} adding to database")
-            await write_to_db(pool, product, price, url, variant, img_link, sizes)
+            await write_to_db(pool, product, price, url, variant, img_link, clothes_sizes)
         else:
             print(f"---{product}, {variant} not in stock")
 
@@ -126,7 +129,7 @@ async def scrape_item(pool, product, url, asession):
         print(f"Error in scrape_item for {product}, {url}: {e}")
 
 
-async def write_to_db(pool, product, price, url, variant, img_link, sizes):
+async def write_to_db(pool, product, price, url, variant, img_link, clothes_sizes):
     """
     Establish a connection to the database and insert data into each table.
     :param pool: SQLAlchemy engine pool
@@ -135,41 +138,41 @@ async def write_to_db(pool, product, price, url, variant, img_link, sizes):
     :param url: Product URL
     :param variant: Product variant
     :param img_link: Image link
-    :param sizes: List of sizes
+    :param clothes_sizes: List of sizes
     :return: None
     """
     try:
         conn = pool.connect()
 
         metadata = MetaData()
-        supreme_items = Table('supreme_items', metadata, autoload_with=conn)
-        supreme_variants = Table('supreme_variants', metadata, autoload_with=conn)
-        supreme_sizes = Table('supreme_sizes', metadata, autoload_with=conn)
+        items = Table('items', metadata, autoload_with=conn)
+        variants = Table('variants', metadata, autoload_with=conn)
+        sizes = Table('sizes', metadata, autoload_with=conn)
 
-        stmt = select(supreme_items).where(supreme_items.c.product == product)
+        stmt = select(items).where(items.c.product == product)
         result = conn.execute(stmt)
         row = result.fetchone()
 
-        # write to supreme_items db
+        # write to items
         # get resulting item_id to write for other tables
         if row:
             # if this is first time product is added
             item_id = row[0]
         else:
             # add product to table
-            item_insert_stmt = insert(supreme_items).values(product=product, price=price)
+            item_insert_stmt = insert(items).values(product=product, price=price)
             result = conn.execute(item_insert_stmt)
             item_id = result.inserted_primary_key[0]
 
-        # write to supreme_variant
+        # write to variants
         # get resulting variant_id for supreme_size table
-        variant_insert_stmt = insert(supreme_variants).values(item_id=item_id, variant=variant, img_link=img_link, url=url)
+        variant_insert_stmt = insert(variants).values(item_id=item_id, variant=variant, img_link=img_link, url=url)
         result = conn.execute(variant_insert_stmt)
         variant_id = result.inserted_primary_key[0]
 
-        # write to supreme_sizes
-        for size in sizes:
-            size_insert_stmt = insert(supreme_sizes).values(item_id=item_id, variant_id=variant_id, size=size)
+        # write to sizes
+        for size in clothes_sizes:
+            size_insert_stmt = insert(sizes).values(item_id=item_id, variant_id=variant_id, size=size)
             conn.execute(size_insert_stmt)
 
         conn.commit()
