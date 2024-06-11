@@ -108,8 +108,8 @@ async def scrape_item(pool, product, url, asession):
         img_link = r.html.find('div[data-testid="ProductCarousel-wrapper"] img', first=True).attrs["src"]
         title_with_variant = r.html.find('div[data-testid="ProductCarousel-wrapper"] img', first=True).attrs["alt"]
         variant = ""
-        if len(title_with_variant) == 2:
-            variant = title_with_variant.split("-").strip()[1]
+        if len(title_with_variant) >= 2:
+            variant = title_with_variant.split("-")[1].strip()
         price = r.html.find('h3[data-testid="price"]', first=True).text.replace("$", "")
         sizes_html = r.html.find('select[aria-label="size"] option')
         clothes_sizes = [element.text for element in sizes_html]
