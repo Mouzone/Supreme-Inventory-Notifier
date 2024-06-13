@@ -13,7 +13,7 @@ def getconn() -> pymysql.connections.Connection:
     load_dotenv()
 
     # Create a connection using credentials from the .env file
-    db_host = '127.0.0.1'
+    db_host = os.environ.get("DB_HOST")
     db_user = os.environ.get("DB_USER")
     db_pass = os.environ.get("DB_PASS")
     db_name = os.environ.get("DB_NAME")
@@ -102,7 +102,7 @@ async def scrape_item(pool, product, url, asession):
         print(f"--Opening: {product}")
         # render webpage
         r = await asession.get(BASE_URL + url)
-        await r.html.arender(sleep=1)
+        await r.html.arender(sleep=1.5)
         print(f"--Opened: {product}")
 
         img_link = r.html.find('div[data-testid="ProductCarousel-wrapper"] img', first=True).attrs["src"]

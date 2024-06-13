@@ -1,3 +1,4 @@
+
 - rename databases and tables to utilize multiple databases for each brand
 - rewrite properly using async
 - refactor db commits into smaller transactions
