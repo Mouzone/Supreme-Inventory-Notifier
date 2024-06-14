@@ -185,6 +185,5 @@ async def write_to_db(pool, product, price, url, variant, img_link, clothes_size
         conn.close()
 
 
-if __name__ == "__main__":
-    asession = AsyncHTMLSession()
-    asession.run(scrape_items)
+asession = AsyncHTMLSession()
+asession.run(scrape_items)
