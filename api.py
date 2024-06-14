@@ -1,17 +1,18 @@
 from fastapi import FastAPI
+from contextlib import asynccontextmanager
 from sqlmodel import Field, Session, SQLModel, create_engine, select
 from dotenv import load_dotenv
 import os
 
 
 class Items(SQLModel, table=True):
-    item_id: int = Field(default=None, primary_key=True)
+    item_id: int = Field(primary_key=True)
     product: str
     price: float
 
 
 class Variants(SQLModel, table=True):
-    variant_id: int = Field(default=None, primary_key=True)
+    variant_id: int = Field(primary_key=True)
     item_id: int = Field(foreign_key="items.item_id")
     variant: str
     img_link: str
@@ -19,7 +20,7 @@ class Variants(SQLModel, table=True):
 
 
 class Sizes(SQLModel, table=True):
-    size_id: int = Field(default=None, primary_key=True)
+    size_id: int = Field(primary_key=True)
     item_id: int = Field(foreign_key="items.item_id")
     variant_id: int = Field(foreign_key="variants.variant_id")
     size: str
@@ -42,12 +43,12 @@ def create_db_and_tables():
     SQLModel.metadata.create_all(engine)
 
 
-app = FastAPI()
-
-
-@app.on_event("startup")
-def on_startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     create_db_and_tables()
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 
 @app.get("/items/")
@@ -69,3 +70,28 @@ def read_sizes():
     with Session(engine) as session:
         sizes = session.exec(select(Sizes)).all()
         return sizes
+
+
+@app.get("/descriptive/")
+def read_descriptive():
+    with Session(engine) as session:
+        statement = (
+            select(Sizes, Variants, Items)
+            .join(Variants, Sizes.variant_id == Variants.variant_id)
+            .join(Items, Sizes.item_id == Items.item_id)
+        )
+        results = session.exec(statement).all()
+
+        descriptive_results = [
+            {
+                "product": item.product,
+                "variant": variant.variant,
+                "size": size.size,
+                "img_link": variant.img_link,
+                "url": variant.url,
+                "price": item.price
+            }
+            for size, variant, item in results
+        ]
+
+        return descriptive_results
