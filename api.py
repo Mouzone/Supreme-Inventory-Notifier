@@ -90,24 +90,45 @@ def read_sizes():
 
 @app.get("/descriptive/")
 def read_descriptive():
-    with Session(engine) as session:
-        statement = (
-            select(Sizes, Variants, Items)
-            .join(Variants, Sizes.variant_id == Variants.variant_id)
-            .join(Items, Sizes.item_id == Items.item_id)
-        )
-        results = session.exec(statement).all()
-
-        descriptive_results = [
-            {
+    '''
+    return:
+    [{
+        product: -,
+        price: -,
+        url: -,
+        variants:
+            [{
+                variant:- ,
+                img_link -,
+                sizes: [x, y, z]
+            }]
+    }...]
+    '''
+    with (Session(engine) as session):
+        items = session.exec(
+            select(Items)
+        ).all()
+        results = []
+        for item in items:
+            variants = session.exec(
+                select(Variants)
+                .where(Variants.item_id == item.item_id)
+            ).all()
+            result = {
                 "product": item.product,
-                "variant": variant.variant,
-                "size": size.size,
-                "img_link": variant.img_link,
-                "url": variant.url,
-                "price": item.price
+                "price": item.price,
+                "variants": []
             }
-            for size, variant, item in results
-        ]
-
-        return descriptive_results
+            for variant in variants:
+                sizes = session.exec(
+                    select(Sizes)
+                    .where(Sizes.variant_id == variant.variant_id)
+                ).all()
+                result["variants"].append({
+                    "variant": variant.variant,
+                    "img_link": variant.img_link,
+                    "url": variant.url,
+                    "sizes": [size.size for size in sizes]
+                })
+            results.append(result)
+        return results
