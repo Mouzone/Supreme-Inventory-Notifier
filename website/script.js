@@ -17,6 +17,9 @@ fetch("http://127.0.0.1:8000/descriptive/", {
 
         data.forEach(item => {
             const item_element = document.createElement("div.item")
+            item_element.insertAdjacentHTML("beforeend", `
+                <span> ${item["product"]}: ${item["price"]}</span>
+            `)
             item["variants"].forEach(variant => {
                 items.insertAdjacentElement("beforeend", item_element)
                 item_element.insertAdjacentHTML("beforeend",
