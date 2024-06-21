@@ -41,9 +41,9 @@ div#items {
     grid-template: 1fr / 1fr 1fr 1fr 1fr;
 }
 
+/*make the tracks work such that sizes moves to the side of the respective image*/
 div.item {
     display: grid;
-    grid-template: 1fr / 3fr 1fr;
 }
 
 div.sizes {
@@ -56,4 +56,8 @@ div.sizes {
 div.sizes span {
     border: 1px solid lightcoral;
     background-color: lightcoral;
+}
+
+span.details {
+    margin-bottom: 30px;
 }

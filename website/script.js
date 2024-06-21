@@ -13,33 +13,26 @@ fetch("http://127.0.0.1:8000/descriptive/", {
         return response.json()
     })
     .then(data => {
-        console.log(data)
-
         data.forEach(item => {
             const item_element = document.createElement("div.item")
+            items.insertAdjacentElement("beforeend", item_element)
             item_element.insertAdjacentHTML("beforeend", `
-                <span> ${item["product"]}: ${item["price"]}</span>
+                <span class="details"> ${item["product"]}: $${item["price"]}</span>
             `)
+            const variants = document.createElement("div.variants")
+            item_element.insertAdjacentElement("beforeend", variants)
             item["variants"].forEach(variant => {
-                items.insertAdjacentElement("beforeend", item_element)
-                item_element.insertAdjacentHTML("beforeend",
-                    `
-                        <div class="item">
-                            <img src=https:${variant["img_link"]} alt="missing">
-                            <div class="sizes"></div>
-                        </div>
-                    `)
-                const recent_item_element = document.querySelector("div#items").lastElementChild
-                const sizes_list = recent_item_element.lastElementChild.querySelector("div.sizes")
+                const variant_element = document.createElement("div.variant")
+                variants.insertAdjacentElement("beforeend", variant_element)
+                variant_element.insertAdjacentHTML("beforeend",
+                    `<img src=https:${variant["img_link"]} alt="missing">`)
+                const sizes = document.createElement("div.sizes")
+                variant_element.insertAdjacentElement("beforeend", sizes)
                 variant["sizes"].forEach(size => {
-                    sizes_list.insertAdjacentHTML("beforeend",
-                        `
-                        <span> ${size} </span>
-                        `)
+                    sizes.insertAdjacentHTML("beforeend", `<span> ${size} </span>`)
                 })
             })
         })
-        // keys are product, variant, size, img_link, url, size, price
         // img_link prefix is https:
         // url prefix is https://us.supreme.com/products
     })
