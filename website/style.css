@@ -1,0 +1,21 @@
+img {
+    max-width: 250px;
+    max-height: 250px;
+    display: flow;
+}
+
+div#items {
+    display: grid;
+    grid-template: 1fr / 1fr 1fr 1fr 1fr;
+}
+
+div.item {
+    display: grid;
+    grid-template: 1fr / 3fr 1fr;
+}
+
+div.sizes {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, 1fr);
+    align-items: center;
+}

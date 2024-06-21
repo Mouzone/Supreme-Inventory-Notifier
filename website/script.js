@@ -1,4 +1,4 @@
-const list = document.querySelector("ul#items")
+const items = document.querySelector("div#items")
 
 fetch("http://127.0.0.1:8000/descriptive/", {
     method: "GET",
@@ -13,19 +13,28 @@ fetch("http://127.0.0.1:8000/descriptive/", {
         return response.json()
     })
     .then(data => {
+        console.log(data)
+
         data.forEach(item => {
-            list.insertAdjacentHTML("beforeend", `
-                <li>
-                    <img src="${item["img_link"]}" alt="">
-                    <ul>
-                        <li> ${item["product"]} </li>
-                        <li> ${item["variant"]} </li>
-                        <li> ${item["size"]} </li>
-                        <li> ${item["url"]} </li>
-                        <li> ${item["price"]} </li>
-                    </ul>
-                </li>
-            `)
+            const item_element = document.createElement("div.item")
+            item["variants"].forEach(variant => {
+                items.insertAdjacentElement("beforeend", item_element)
+                item_element.insertAdjacentHTML("beforeend",
+                    `
+                        <div class="item">
+                            <img src=https:${variant["img_link"]} alt="missing">
+                            <div class="sizes"></div>
+                        </div>
+                    `)
+                const recent_item_element = document.querySelector("div#items").lastElementChild
+                const sizes_list = recent_item_element.lastElementChild.querySelector("div.sizes")
+                variant["sizes"].forEach(size => {
+                    sizes_list.insertAdjacentHTML("beforeend",
+                        `
+                        <span> ${size} </span>
+                        `)
+                })
+            })
         })
         // keys are product, variant, size, img_link, url, size, price
         // img_link prefix is https:
