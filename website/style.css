@@ -41,14 +41,23 @@ div#items {
     grid-template: 1fr / 1fr 1fr 1fr 1fr;
 }
 
-/*make the tracks work such that sizes moves to the side of the respective image*/
 div.item {
-    display: grid;
+    display: flex;
+    flex-direction: column;
 }
 
+span.details {
+    text-align: center;
+}
+
+div.variant {
+    display: grid;
+    grid-template-columns: 3fr 1fr;
+}
 div.sizes {
     display: grid;
-    grid-template-columns: repeat(auto-fit, 1fr);
+    grid-template-columns: 1fr;
+    grid-auto-rows: 1fr;
     align-items: center;
     justify-items: center;
 }

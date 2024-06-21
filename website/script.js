@@ -14,19 +14,23 @@ fetch("http://127.0.0.1:8000/descriptive/", {
     })
     .then(data => {
         data.forEach(item => {
-            const item_element = document.createElement("div.item")
+            const item_element = document.createElement("div")
+            item_element.classList.add("item")
             items.insertAdjacentElement("beforeend", item_element)
             item_element.insertAdjacentHTML("beforeend", `
                 <span class="details"> ${item["product"]}: $${item["price"]}</span>
             `)
-            const variants = document.createElement("div.variants")
+            const variants = document.createElement("div")
+            variants.classList.add("variants")
             item_element.insertAdjacentElement("beforeend", variants)
             item["variants"].forEach(variant => {
-                const variant_element = document.createElement("div.variant")
+                const variant_element = document.createElement("div")
+                variant_element.classList.add("variant")
                 variants.insertAdjacentElement("beforeend", variant_element)
                 variant_element.insertAdjacentHTML("beforeend",
-                    `<img src=https:${variant["img_link"]} alt="missing">`)
-                const sizes = document.createElement("div.sizes")
+                                                `<img src=https:${variant["img_link"]} alt="missing">`)
+                const sizes = document.createElement("div")
+                sizes.classList.add("sizes")
                 variant_element.insertAdjacentElement("beforeend", sizes)
                 variant["sizes"].forEach(size => {
                     sizes.insertAdjacentHTML("beforeend", `<span> ${size} </span>`)
