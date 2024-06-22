@@ -42,7 +42,6 @@ div#items {
 }
 
 div.item {
-    display: flex;
     flex-direction: column;
 }
 
@@ -54,6 +53,7 @@ div.variant {
     display: grid;
     grid-template-columns: 3fr 1fr;
 }
+
 div.sizes {
     display: grid;
     grid-template-columns: 1fr;
